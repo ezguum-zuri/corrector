@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Corrector de textos</title>
+<meta name="description" content="Corrige ortografía, gramática, tildes y puntuación en castellano.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Corrector">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#f6f3ee" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#171614" media="(prefers-color-scheme: dark)">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f6f3ee; --card:#fffdf9; --ink:#1f1d1a; --muted:#6f6a62; --line:#e4ded4;
+  --accent:#2f5d50; --accent-ink:#fff; --del:#b3402f; --del-bg:#f8e1dc; --ins:#2f6b3a; --ins-bg:#dcefdc;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#171614;--card:#201f1c;--ink:#ece7df;--muted:#a49d92;--line:#35322d;
+  --accent:#7fb8a5;--accent-ink:#0f1a17;--del:#f08b79;--del-bg:#3d2420;--ins:#8fd39a;--ins-bg:#1f3523;}
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Inter,system-ui,-apple-system,sans-serif}
+.wrap{max-width:760px;margin:0 auto;
+  padding:calc(20px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))}
+h1{font:600 1.7rem/1.2 Literata,Georgia,serif;margin:6px 0 4px}
+.sub{color:var(--muted);margin:0 0 18px;font-size:.95rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+textarea{width:100%;min-height:200px;border:0;resize:vertical;background:transparent;color:var(--ink);
+  font:16px/1.6 Literata,Georgia,serif;outline:none;-webkit-appearance:none;padding:0}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
+button{font:500 1rem Inter,system-ui,sans-serif;border-radius:10px;border:1px solid var(--line);
+  background:var(--card);color:var(--ink);padding:10px 14px;cursor:pointer;-webkit-appearance:none;touch-action:manipulation}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);padding:10px 18px;font-weight:600}
+button:disabled{opacity:.55}
+.spacer{flex:1}
+.count{color:var(--muted);font-size:.82rem}
+.out{margin-top:18px;display:none}
+.out h2{font:600 1.05rem Inter,system-ui,sans-serif;margin:0 0 8px;display:flex;align-items:center;gap:8px}
+.badge{font-size:.78rem;font-weight:600;background:var(--ins-bg);color:var(--ins);padding:2px 8px;border-radius:99px}
+.text{font:1.02rem/1.7 Literata,Georgia,serif;white-space:pre-wrap;word-wrap:break-word}
+del{color:var(--del);background:var(--del-bg);text-decoration:line-through;border-radius:3px;padding:0 1px}
+ins{color:var(--ins);background:var(--ins-bg);text-decoration:none;border-radius:3px;padding:0 1px;font-weight:600}
+.changes{list-style:none;padding:0;margin:14px 0 0}
+.changes li{border-top:1px solid var(--line);padding:10px 2px;font-size:.92rem}
+.changes .pair{font-family:Literata,Georgia,serif}
+.changes .why{color:var(--muted);margin-top:2px}
+.status{color:var(--muted);font-size:.9rem;margin-top:10px;min-height:1.3em}
+.err{color:var(--del)}
+.note{color:var(--muted);font-size:.8rem;margin-top:18px;text-align:center}
+.note a{color:inherit}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--bg);
+  padding:8px 14px;border-radius:10px;font-size:.9rem;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Corrector de textos</h1>
+  <p class="sub">Pega tu texto: corrige ortografía, gramática, tildes y puntuación sin cambiar tu estilo.</p>
+
+  <div class="card">
+    <textarea id="input" placeholder="Escribe o pega aquí tu texto…" autocapitalize="sentences"></textarea>
+    <div class="row">
+      <button class="primary" id="go">Corregir</button>
+      <button id="clear">Borrar</button>
+      <span class="spacer"></span>
+      <span class="count" id="count">0 palabras</span>
+    </div>
+    <div class="status" id="status"></div>
+  </div>
+
+  <div class="out" id="out">
+    <div class="card">
+      <h2>Cambios marcados <span class="badge" id="nchanges"></span></h2>
+      <div class="text" id="diff"></div>
+    </div>
+    <div class="card" style="margin-top:12px">
+      <h2>Texto corregido</h2>
+      <div class="text" id="clean"></div>
+      <div class="row">
+        <button class="primary" id="copy">Copiar texto corregido</button>
+        <button id="reuse">Seguir editando</button>
+      </div>
+    </div>
+    <div class="card" style="margin-top:12px" id="whyCard">
+      <h2>Por qué</h2>
+      <ul class="changes" id="changes"></ul>
+    </div>
+  </div>
+
+  <p class="note">Corrección en castellano con <a href="https://languagetool.org" target="_blank" rel="noopener">LanguageTool</a>. El texto se envía a su servicio para revisarlo.</p>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const MAX_CHARS = 18000; // límite de la API gratuita (~20 KB por petición)
+let ctrl = null, corrected = '';
+const store = {
+  get(k){ try { return localStorage.getItem(k) || ''; } catch(e){ return ''; } },
+  set(k,v){ try { v ? localStorage.setItem(k,v) : localStorage.removeItem(k); } catch(e){} }
+};
+
+$('input').value = store.get('corrector-draft');
+updateCount();
+
+$('input').addEventListener('input', () => { updateCount(); store.set('corrector-draft', $('input').value); });
+$('clear').onclick = () => { $('input').value=''; updateCount(); $('out').style.display='none'; setStatus(''); store.set('corrector-draft',''); $('input').focus(); };
+$('reuse').onclick = () => { $('input').value = corrected; updateCount(); store.set('corrector-draft', corrected); window.scrollTo({top:0,behavior:'smooth'}); };
+$('copy').onclick = copyText;
+$('go').onclick = run;
+
+function updateCount(){ const n = ($('input').value.trim().match(/\S+/g)||[]).length; $('count').textContent = n + (n===1?' palabra':' palabras'); }
+function setStatus(t, err){ $('status').textContent = t; $('status').className = 'status' + (err?' err':''); }
+function toast(t){ const el=$('toast'); el.textContent=t; el.classList.add('show'); clearTimeout(toast.t); toast.t=setTimeout(()=>el.classList.remove('show'),1800); }
+function esc(s){ return s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+async function copyText(){
+  try {
+    await navigator.clipboard.writeText(corrected);
+    toast('Texto copiado');
+  } catch(e) {
+    // Alternativa para navegadores sin API de portapapeles
+    const ta = document.createElement('textarea');
+    ta.value = corrected; ta.setAttribute('readonly',''); ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, ta.value.length);
+    let ok = false; try { ok = document.execCommand('copy'); } catch(_){}
+    document.body.removeChild(ta);
+    toast(ok ? 'Texto copiado' : 'No se pudo copiar: mantén pulsado el texto para copiarlo');
+  }
+}
+
+async function run(){
+  const text = $('input').value;
+  if (!text.trim()) { setStatus('Escribe algo primero.'); return; }
+  if (text.length > MAX_CHARS) { setStatus('El texto es demasiado largo: corrígelo por partes (máx. ' + MAX_CHARS.toLocaleString('es') + ' caracteres).', true); return; }
+  if (ctrl) ctrl.abort();
+  ctrl = new AbortController();
+  $('go').disabled = true; setStatus('Corrigiendo…');
+  document.activeElement && document.activeElement.blur();
+  try {
+    show(text, await check(text));
+    setStatus('');
+  } catch (e) {
+    if (e && e.name === 'AbortError') return;
+    setStatus(e && e.message ? e.message : 'No se pudo corregir el texto. Inténtalo de nuevo.', true);
+  } finally { $('go').disabled = false; }
+}
+
+async function check(text){
+  const body = new URLSearchParams({ text, language: 'es' });
+  let r;
+  try {
+    r = await fetch('https://api.languagetool.org/v2/check', { method: 'POST', body, signal: ctrl.signal });
+  } catch(e) {
+    if (e.name === 'AbortError') throw e;
+    throw new Error('No hay conexión con LanguageTool. Revisa tu conexión a internet e inténtalo de nuevo.');
+  }
+  if (r.status === 429) throw new Error('Demasiadas correcciones seguidas. Espera un minuto y vuelve a intentarlo.');
+  if (r.status === 413) throw new Error('El texto es demasiado largo: corrígelo por partes.');
+  if (!r.ok) throw new Error('LanguageTool no ha podido revisar el texto (error ' + r.status + '). Inténtalo de nuevo.');
+  const data = await r.json();
+  const matches = (data.matches || [])
+    .filter(m => m.replacements && m.replacements.length)
+    .sort((a,b) => a.offset - b.offset);
+  let out = '', pos = 0; const changes = [];
+  for (const m of matches) {
+    if (m.offset < pos) continue; // evita sugerencias solapadas
+    const from = text.substr(m.offset, m.length), to = m.replacements[0].value;
+    if (from === to) continue;
+    out += text.slice(pos, m.offset) + to; pos = m.offset + m.length;
+    changes.push({ from, to, why: m.message });
+  }
+  out += text.slice(pos);
+  return { corrected: out, changes };
+}
+
+function show(orig, val){
+  corrected = val.corrected;
+  const changes = val.changes;
+  $('diff').innerHTML = diffHtml(orig, corrected);
+  $('clean').textContent = corrected;
+  $('nchanges').textContent = changes.length ? changes.length + (changes.length===1?' cambio':' cambios') : 'Sin errores';
+  $('changes').innerHTML = changes.map(c =>
+    `<li><div class="pair"><del>${esc(c.from.trim() ? c.from : '␣')}</del> → <ins>${esc(c.to.trim() ? c.to : '␣')}</ins></div><div class="why">${esc(c.why||'')}</div></li>`).join('');
+  $('whyCard').style.display = changes.length ? '' : 'none';
+  $('out').style.display = 'block';
+  $('out').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+// Diff por palabras (LCS): rojo = quitado, verde = añadido
+function tok(s){ return s.match(/[\p{L}\p{N}]+|\s+|[^\p{L}\p{N}\s]/gu) || []; }
+function diffHtml(a, b){
+  const A = tok(a), B = tok(b), n = A.length, m = B.length;
+  if (n * m > 6e6) return esc(b);
+  const W = m + 1, L = new Uint32Array((n + 1) * W);
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--)
+    L[i*W+j] = A[i] === B[j] ? L[(i+1)*W+j+1] + 1 : Math.max(L[(i+1)*W+j], L[i*W+j+1]);
+  let i = 0, j = 0, out = '', d = '', s = '';
+  const flush = () => { if (d) out += `<del>${esc(d)}</del>`; if (s) out += `<ins>${esc(s)}</ins>`; d = s = ''; };
+  while (i < n && j < m) {
+    if (A[i] === B[j]) { flush(); out += esc(A[i]); i++; j++; }
+    else if (L[(i+1)*W+j] >= L[i*W+j+1]) d += A[i++];
+    else s += B[j++];
+  }
+  while (i < n) d += A[i++]; while (j < m) s += B[j++];
+  flush();
+  return out;
+}
+</script>
+</body>
+</html>
